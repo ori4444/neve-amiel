@@ -21,16 +21,16 @@ function getPool() {
         port:     Number(parsed.port) || 5432,
         ssl:      { rejectUnauthorized: false },
         max:      2,
-        idleTimeoutMillis:    10000,
-        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis:    30000,
+        connectionTimeoutMillis: 15000,
       };
     } else {
       config = {
         connectionString: dbUrl,
         ssl: dbUrl ? { rejectUnauthorized: false } : false,
         max: 2,
-        idleTimeoutMillis:    10000,
-        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis:    30000,
+        connectionTimeoutMillis: 15000,
       };
     }
 
