@@ -1,0 +1,7 @@
+node_modules/
+server/neve_amiel.db
+server/neve_amiel.db-shm
+server/neve_amiel.db-wal
+client/dist/
+.env
+*.log
