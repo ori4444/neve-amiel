@@ -27,7 +27,8 @@ export default function LoginPage() {
       login(data.token, data.user);
       navigate('/grades');
     } catch (err) {
-      setError(err.response?.data?.error || (err.code === 'ERR_NETWORK' ? 'לא ניתן להתחבר לשרת' : 'שגיאה, נסה/י שוב'));
+      const msg = err.response?.data?.error;
+      setError(typeof msg === 'string' ? msg : err.code === 'ERR_NETWORK' ? 'לא ניתן להתחבר לשרת' : 'שגיאת שרת, נסה/י שוב');
     } finally {
       setLoading(false);
     }
@@ -99,11 +100,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {mode === 'login' && (
-          <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '12px', color: 'var(--gray-400)' }}>
-            כניסה ראשונה: משתמש <strong>admin</strong> סיסמה <strong>admin123</strong>
-          </p>
-        )}
       </div>
     </div>
   );

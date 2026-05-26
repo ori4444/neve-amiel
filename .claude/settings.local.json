@@ -16,7 +16,9 @@
       "Bash(node --check server/middleware/auth.js)",
       "Bash(node --check server/routes/auth.js)",
       "Bash(node --check server/routes/students.js)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(Get-ChildItem C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\server *)"
     ]
   }
 }
