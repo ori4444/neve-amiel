@@ -27,8 +27,9 @@ export default function LoginPage() {
       login(data.token, data.user);
       navigate('/grades');
     } catch (err) {
-      const msg = err.response?.data?.error;
-      setError(typeof msg === 'string' ? msg : err.code === 'ERR_NETWORK' ? 'לא ניתן להתחבר לשרת' : 'שגיאת שרת, נסה/י שוב');
+      const raw = err.response?.data?.error;
+      const msg = typeof raw === 'string' ? raw : null;
+      setError(msg || (err.code === 'ERR_NETWORK' ? 'לא ניתן להתחבר לשרת' : 'שגיאת שרת, נסה/י שוב'));
     } finally {
       setLoading(false);
     }
