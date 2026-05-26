@@ -116,6 +116,30 @@ router.get('/export/excel', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
+router.get('/medication', authenticateToken, async (req, res) => {
+  const { start_date, end_date, grade } = req.query;
+  if (!start_date || !end_date) return res.status(400).json({ error: 'נדרשים תאריכי התחלה וסיום' });
+  try {
+    const params = [start_date, end_date];
+    let q = `
+      SELECT s.signing_date, s.signing_type, s.action, s.reason,
+             st.name AS student_name, st.grade,
+             u.full_name AS staff_name
+      FROM signatures s
+      JOIN students st ON s.student_id = st.id
+      JOIN users u ON s.user_id = u.id
+      WHERE s.signing_date >= $1 AND s.signing_date <= $2
+    `;
+    if (grade) { q += ` AND st.grade = $3`; params.push(grade); }
+    q += ' ORDER BY s.signing_date, st.grade, st.name, s.signing_type';
+    const { rows } = await getPool().query(q, params);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'שגיאת שרת' });
+  }
+});
+
 router.get('/audit', authenticateToken, requireAdmin, async (_req, res) => {
   try {
     const { rows } = await getPool().query(`

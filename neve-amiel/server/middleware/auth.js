@@ -11,7 +11,7 @@ async function authenticateToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const { rows } = await getPool().query(
-      'SELECT id, username, full_name, role, active FROM users WHERE id = $1',
+ה      'SELECT id, username, full_name, role, active, grade FROM users WHERE id = $1',
       [decoded.userId]
     );
     const user = rows[0];

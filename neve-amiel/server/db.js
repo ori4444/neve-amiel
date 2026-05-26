@@ -99,10 +99,26 @@ async function initializeDatabase() {
       )
     `);
 
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS grade TEXT`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS daily_summaries (
+        id         SERIAL PRIMARY KEY,
+        grade      TEXT NOT NULL CHECK (grade IN ('ט','י','יא','יב')),
+        date       DATE NOT NULL,
+        content    TEXT NOT NULL,
+        user_id    INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (grade, date)
+      )
+    `);
+
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sig_date    ON signatures(signing_date)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sig_student ON signatures(student_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sig_user    ON signatures(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_stu_grade   ON students(grade)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sum_grade_date ON daily_summaries(grade, date)`);
 
     // --- Seed default admin + sample students if DB is empty ---
     const { rows } = await client.query('SELECT COUNT(*) AS c FROM users');

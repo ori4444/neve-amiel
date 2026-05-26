@@ -30,7 +30,7 @@ router.post('/login', async (req, res) => {
     ]);
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ token, user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role } });
+    res.json({ token, user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, grade: user.grade } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'שגיאת שרת' });
@@ -38,37 +38,43 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-  const { username, password, full_name, admin_code } = req.body;
+  const { username, password, full_name, admin_code, grade } = req.body;
   if (!username || !password || !full_name) return res.status(400).json({ error: 'נדרשים שם משתמש, סיסמה ושם מלא' });
   if (password.length < 6)         return res.status(400).json({ error: 'הסיסמה חייבת להכיל לפחות 6 תווים' });
   if (username.trim().length < 3)  return res.status(400).json({ error: 'שם המשתמש חייב להכיל לפחות 3 תווים' });
+
+  const role = admin_code === 'NEVE2024ADMIN' ? 'admin' : 'staff';
+  const validGrades = ['ט', 'י', 'יא', 'יב'];
+  if (role === 'staff' && !validGrades.includes(grade)) return res.status(400).json({ error: 'נדרש לבחור כיתה' });
 
   try {
     const pool = getPool();
     const { rows: ex } = await pool.query('SELECT id FROM users WHERE username = $1', [username.trim()]);
     if (ex.length) return res.status(409).json({ error: 'שם המשתמש כבר קיים במערכת' });
 
-    const role = admin_code === 'NEVE2024ADMIN' ? 'admin' : 'staff';
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
-      'INSERT INTO users (username, password_hash, full_name, role) VALUES ($1,$2,$3,$4) RETURNING id',
-      [username.trim(), hash, full_name.trim(), role]
+      'INSERT INTO users (username, password_hash, full_name, role, grade) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+      [username.trim(), hash, full_name.trim(), role, role === 'staff' ? grade : null]
     );
     const newId = rows[0].id;
 
     await pool.query(
       'INSERT INTO audit_logs (user_id, action, ip_address, details) VALUES ($1,$2,$3,$4)',
-      [newId, 'register', req.ip, JSON.stringify({ username, role })]
+      [newId, 'register', req.ip, JSON.stringify({ username, role, grade })]
     );
 
     const token = jwt.sign({ userId: newId }, JWT_SECRET, { expiresIn: '24h' });
-    res.status(201).json({ token, user: { id: newId, username: username.trim(), full_name: full_name.trim(), role } });
+    res.status(201).json({ token, user: { id: newId, username: username.trim(), full_name: full_name.trim(), role, grade: role === 'staff' ? grade : null } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'שגיאת שרת' });
   }
 });
 
-router.get('/me', authenticateToken, (req, res) => res.json({ user: req.user }));
+router.get('/me', authenticateToken, (req, res) => {
+  const { id, username, full_name, role, grade } = req.user;
+  res.json({ user: { id, username, full_name, role, grade } });
+});
 
 module.exports = router;

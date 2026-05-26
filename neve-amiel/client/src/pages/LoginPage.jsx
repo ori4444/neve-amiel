@@ -3,9 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
+const GRADES = [
+  { value: 'ט', label: "ט'" },
+  { value: 'י', label: "י'" },
+  { value: 'יא', label: "יא'" },
+  { value: 'יב', label: "יב'" },
+];
+
 export default function LoginPage() {
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ username: '', password: '', full_name: '', admin_code: '' });
+  const [form, setForm] = useState({ username: '', password: '', full_name: '', admin_code: '', grade: '' });
   const [showAdminCode, setShowAdminCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,7 +29,7 @@ export default function LoginPage() {
       const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
       const payload = mode === 'login'
         ? { username: form.username, password: form.password }
-        : { username: form.username, password: form.password, full_name: form.full_name, admin_code: showAdminCode ? form.admin_code : undefined };
+        : { username: form.username, password: form.password, full_name: form.full_name, admin_code: showAdminCode ? form.admin_code : undefined, grade: !showAdminCode ? form.grade : undefined };
       const { data } = await api.post(endpoint, payload);
       login(data.token, data.user);
       navigate('/grades');
@@ -35,7 +42,7 @@ export default function LoginPage() {
     }
   };
 
-  const switchMode = (m) => { setMode(m); setError(''); setForm({ username: '', password: '', full_name: '', admin_code: '' }); setShowAdminCode(false); };
+  const switchMode = (m) => { setMode(m); setError(''); setForm({ username: '', password: '', full_name: '', admin_code: '', grade: '' }); setShowAdminCode(false); };
 
   return (
     <div style={{
@@ -82,10 +89,38 @@ export default function LoginPage() {
             <input className="form-input" type="password" placeholder={mode === 'register' ? 'לפחות 6 תווים' : 'הכנס/י סיסמה'} value={form.password} onChange={set('password')} required autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
           </div>
 
+          {mode === 'register' && !showAdminCode && (
+            <div className="form-group">
+              <label className="form-label">כיתה</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {GRADES.map(g => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, grade: g.value }))}
+                    style={{
+                      padding: '10px 4px',
+                      borderRadius: '10px',
+                      border: `2px solid ${form.grade === g.value ? '#2563eb' : '#e2e8f0'}`,
+                      background: form.grade === g.value ? '#eff6ff' : 'white',
+                      color: form.grade === g.value ? '#1d4ed8' : '#374151',
+                      fontWeight: form.grade === g.value ? '700' : '500',
+                      fontSize: '16px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {mode === 'register' && (
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={showAdminCode} onChange={e => setShowAdminCode(e.target.checked)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                <input type="checkbox" checked={showAdminCode} onChange={e => { setShowAdminCode(e.target.checked); setForm(p => ({ ...p, grade: '' })); }} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
                 הרשמה כמנהל מערכת
               </label>
               {showAdminCode && (

@@ -18,6 +18,10 @@ export default function GradeSelectionPage() {
     navigate('/signature-type');
   };
 
+  const visibleGrades = user?.role === 'admin'
+    ? GRADES
+    : GRADES.filter(g => g.value === user?.grade);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -42,7 +46,7 @@ export default function GradeSelectionPage() {
         <p style={{ color: 'var(--gray-500)', marginBottom: '24px', fontSize: '15px' }}>לאיזו כיתה תרצה/י להחתים?</p>
 
         <div className="selection-grid">
-          {GRADES.map(g => (
+          {visibleGrades.map(g => (
             <div key={g.value} className="selection-card" onClick={() => handleSelect(g.value)}>
               <div className="s-icon">{g.icon}</div>
               <div className="s-label">{g.value}</div>

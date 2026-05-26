@@ -7,6 +7,8 @@ import SignatureTypePage from './pages/SignatureTypePage';
 import StudentSigningPage from './pages/StudentSigningPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminStudents from './pages/AdminStudents';
+import SummaryViewPage from './pages/SummaryViewPage';
+import Sidebar from './components/Sidebar';
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
@@ -26,6 +28,7 @@ function AppRoutes() {
       <Route path="/signing" element={<ProtectedRoute><StudentSigningPage /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/students" element={<ProtectedRoute adminOnly><AdminStudents /></ProtectedRoute>} />
+      <Route path="/summaries" element={<ProtectedRoute><SummaryViewPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -43,6 +46,7 @@ export default function App() {
       <AuthProvider>
         <OfflineBanner />
         <AppRoutes />
+        <Sidebar />
       </AuthProvider>
     </BrowserRouter>
   );

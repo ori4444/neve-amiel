@@ -31,6 +31,11 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
+  const [reportFilters, setReportFilters] = useState({ start_date: '', end_date: '', grade: '' });
+  const [reportData, setReportData] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSearched, setReportSearched] = useState(false);
+
   useEffect(() => {
     if (tab === 'dashboard') loadStats();
     if (tab === 'signatures') loadSignatures();
@@ -83,6 +88,32 @@ export default function AdminDashboard() {
     try { await api.put(`/users/${u.id}`, { role: newRole }); loadUsers(); } catch {}
   };
 
+  const loadReport = async () => {
+    if (!reportFilters.start_date || !reportFilters.end_date) return;
+    try {
+      setReportLoading(true);
+      setReportSearched(true);
+      const params = new URLSearchParams();
+      params.set('start_date', reportFilters.start_date);
+      params.set('end_date', reportFilters.end_date);
+      if (reportFilters.grade) params.set('grade', reportFilters.grade);
+      const { data } = await api.get(`/reports/medication?${params}`);
+      setReportData(data);
+    } catch {} finally { setReportLoading(false); }
+  };
+
+  const pivotReport = (data) => {
+    const map = new Map();
+    data.forEach(row => {
+      const key = `${row.signing_date}|${row.student_name}|${row.grade}`;
+      if (!map.has(key)) map.set(key, { date: row.signing_date, name: row.student_name, grade: row.grade, morning: null, evening: null, other: null });
+      map.get(key)[row.signing_type] = { action: row.action, staff: row.staff_name };
+    });
+    return Array.from(map.values());
+  };
+
+  const setReportFilter = (k) => (e) => setReportFilters(p => ({ ...p, [k]: e.target.value }));
+
   const setFilter = (k) => (e) => setFilters(p => ({ ...p, [k]: e.target.value }));
 
   return (
@@ -95,7 +126,7 @@ export default function AdminDashboard() {
 
       <div style={{ padding: '0 16px', background: 'white', borderBottom: '2px solid var(--gray-200)' }}>
         <div className="tabs" style={{ marginBottom: 0 }}>
-          {[['dashboard','דשבורד'],['signatures','חתימות'],['users','משתמשים'],['students','תלמידים']].map(([k, l]) => (
+          {[['dashboard','דשבורד'],['signatures','חתימות'],['reports','דוחות'],['users','משתמשים'],['students','תלמידים']].map(([k, l]) => (
             <div key={k} className={`tab ${tab === k ? 'active' : ''}`}
               onClick={() => k === 'students' ? navigate('/admin/students') : setTab(k)}>
               {l}
@@ -211,6 +242,94 @@ export default function AdminDashboard() {
                     {signatures.length === 0 && (
                       <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-400)' }}>לא נמצאו חתימות</td></tr>
                     )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Reports ── */}
+        {tab === 'reports' && (
+          <>
+            <div className="card" style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontWeight: '700', marginBottom: '14px' }}>דוח מצב תרופות</h3>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">מתאריך</label>
+                  <input className="form-input" type="date" value={reportFilters.start_date} onChange={setReportFilter('start_date')} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">עד תאריך</label>
+                  <input className="form-input" type="date" value={reportFilters.end_date} onChange={setReportFilter('end_date')} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">כיתה</label>
+                  <select className="form-input" value={reportFilters.grade} onChange={setReportFilter('grade')}>
+                    <option value="">כל הכיתות</option>
+                    {['ט','י','יא','יב'].map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={loadReport}
+                disabled={!reportFilters.start_date || !reportFilters.end_date || reportLoading}
+              >
+                {reportLoading ? 'טוען...' : 'הפק דוח'}
+              </button>
+            </div>
+
+            {reportLoading && <div className="loading-center"><div className="spinner"/></div>}
+
+            {!reportLoading && reportSearched && reportData.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-400)' }}>
+                לא נמצאו נתונים לטווח התאריכים הנבחר
+              </div>
+            )}
+
+            {!reportLoading && reportData.length > 0 && (
+              <div className="data-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>תאריך</th>
+                      <th>שם תלמיד</th>
+                      <th>כיתה</th>
+                      <th>בוקר</th>
+                      <th>מחתים בוקר</th>
+                      <th>ערב</th>
+                      <th>מחתים ערב</th>
+                      <th>אחר</th>
+                      <th>מחתים אחר</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pivotReport(reportData).map((row, i) => (
+                      <tr key={i}>
+                        <td>{row.date}</td>
+                        <td style={{ fontWeight: '600' }}>{row.name}</td>
+                        <td>{row.grade}</td>
+                        <td>
+                          {row.morning
+                            ? <span className={`badge ${row.morning.action === 'took' ? 'badge-green' : 'badge-red'}`}>{ACTION_LABELS[row.morning.action]}</span>
+                            : <span style={{ color: 'var(--gray-300)' }}>—</span>}
+                        </td>
+                        <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{row.morning?.staff || ''}</td>
+                        <td>
+                          {row.evening
+                            ? <span className={`badge ${row.evening.action === 'took' ? 'badge-green' : 'badge-red'}`}>{ACTION_LABELS[row.evening.action]}</span>
+                            : <span style={{ color: 'var(--gray-300)' }}>—</span>}
+                        </td>
+                        <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{row.evening?.staff || ''}</td>
+                        <td>
+                          {row.other
+                            ? <span className={`badge ${row.other.action === 'took' ? 'badge-green' : 'badge-red'}`}>{ACTION_LABELS[row.other.action]}</span>
+                            : <span style={{ color: 'var(--gray-300)' }}>—</span>}
+                        </td>
+                        <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{row.other?.staff || ''}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

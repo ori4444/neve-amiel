@@ -19,6 +19,7 @@ app.use(express.json());
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/students',   require('./routes/students'));
 app.use('/api/signatures', require('./routes/signatures'));
+app.use('/api/summaries',  require('./routes/summaries'));
 app.use('/api/reports',    require('./routes/reports'));
 app.use('/api/users',      require('./routes/users'));
 

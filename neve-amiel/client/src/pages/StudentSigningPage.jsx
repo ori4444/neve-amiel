@@ -19,13 +19,23 @@ export default function StudentSigningPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  // modal state
   const [modalStudent, setModalStudent] = useState(null);
+  const [modalView, setModalView] = useState(''); // '' | 'signing' | 'summary'
+
+  // signing state
   const [action, setAction] = useState('');
   const [reason, setReason] = useState('');
   const [overrideMode, setOverrideMode] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
+
+  // summary state
+  const [summaryText, setSummaryText] = useState('');
+  const [savingSummary, setSavingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -53,6 +63,16 @@ export default function StudentSigningPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const loadSummary = useCallback(async () => {
+    if (!grade || !signingDate) return;
+    try {
+      const res = await api.get(`/summaries?grade=${grade}&date=${signingDate}`);
+      setSummaryText(res.data?.content || '');
+    } catch {
+      setSummaryText('');
+    }
+  }, [grade, signingDate]);
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(''), 3500);
@@ -60,16 +80,24 @@ export default function StudentSigningPage() {
 
   const openModal = (student) => {
     setModalStudent(student);
+    setModalView('');
     setAction('');
     setReason('');
     setOverrideMode(false);
     setOverrideReason('');
     setModalError('');
+    setSummaryError('');
   };
 
   const closeModal = () => {
     setModalStudent(null);
+    setModalView('');
     setOverrideMode(false);
+  };
+
+  const openSummary = async () => {
+    setModalView('summary');
+    await loadSummary();
   };
 
   const handleSign = async () => {
@@ -106,6 +134,21 @@ export default function StudentSigningPage() {
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveSummary = async () => {
+    if (!summaryText.trim()) { setSummaryError('נדרש להזין סיכום'); return; }
+    setSavingSummary(true);
+    setSummaryError('');
+    try {
+      await api.post('/summaries', { grade, date: signingDate, content: summaryText });
+      closeModal();
+      showToast('✓ הסיכום נשמר בהצלחה');
+    } catch (err) {
+      setSummaryError(err.response?.data?.error || 'שגיאה בשמירה');
+    } finally {
+      setSavingSummary(false);
     }
   };
 
@@ -202,80 +245,149 @@ export default function StudentSigningPage() {
         )}
       </div>
 
-      {/* Sign Modal */}
+      {/* Student Action Modal */}
       {modalStudent && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <div className="modal-title">החתמת {modalStudent.name}</div>
+            <div className="modal-title">{modalStudent.name}</div>
 
-            {modalError && <div className="alert alert-error">{modalError}</div>}
-            {overrideMode && (
-              <div className="alert alert-warning">
-                ⚠ קיימת כבר חתימה לתלמיד/ה זה. הזן/י סיבת עדכון לדריסה.
-              </div>
-            )}
-
-            <div className="form-group">
-              <div className="form-label" style={{ marginBottom: '12px' }}>בחר/י פעולה</div>
-              <div className="grid-2">
+            {/* Initial: choose action */}
+            {modalView === '' && (
+              <div className="grid-2" style={{ marginTop: '8px' }}>
                 <button
-                  className={`btn btn-lg ${action === 'took' ? 'btn-success' : 'btn-secondary'}`}
-                  style={{ fontSize: '17px' }}
-                  onClick={() => setAction('took')}
+                  className="btn btn-primary btn-lg"
+                  style={{ fontSize: '17px', gap: '8px' }}
+                  onClick={() => setModalView('signing')}
                 >
-                  ✓ לקח/ה
+                  ✍️ החתמה
                 </button>
                 <button
-                  className={`btn btn-lg ${action === 'refused' ? 'btn-danger' : 'btn-secondary'}`}
-                  style={{ fontSize: '17px' }}
-                  onClick={() => setAction('refused')}
+                  className="btn btn-secondary btn-lg"
+                  style={{ fontSize: '17px', gap: '8px' }}
+                  onClick={openSummary}
                 >
-                  ✗ סירב/ה
+                  📝 סיכום יומי
                 </button>
               </div>
-            </div>
-
-            {action && (
-              <div className="form-group">
-                <label className="form-label">
-                  {action === 'refused' ? 'סיבה לסירוב (חובה)' : 'הערה (אופציונלי)'}
-                </label>
-                <textarea
-                  className="form-input"
-                  placeholder={action === 'refused' ? 'פרט/י את הסיבה לסירוב...' : 'הוסף/י הערה...'}
-                  value={reason}
-                  onChange={e => setReason(e.target.value)}
-                  rows={2}
-                />
-              </div>
             )}
 
-            {overrideMode && (
-              <div className="form-group">
-                <label className="form-label">סיבת עדכון (חובה)</label>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="הסבר/י מדוע את/ה מעדכנ/ת את החתימה"
-                  value={overrideReason}
-                  onChange={e => setOverrideReason(e.target.value)}
-                />
-              </div>
+            {/* Signing view */}
+            {modalView === 'signing' && (
+              <>
+                {modalError && <div className="alert alert-error">{modalError}</div>}
+                {overrideMode && (
+                  <div className="alert alert-warning">
+                    ⚠ קיימת כבר חתימה לתלמיד/ה זה. הזן/י סיבת עדכון לדריסה.
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <div className="form-label" style={{ marginBottom: '12px' }}>בחר/י פעולה</div>
+                  <div className="grid-2">
+                    <button
+                      className={`btn btn-lg ${action === 'took' ? 'btn-success' : 'btn-secondary'}`}
+                      style={{ fontSize: '17px' }}
+                      onClick={() => setAction('took')}
+                    >
+                      ✓ לקח/ה
+                    </button>
+                    <button
+                      className={`btn btn-lg ${action === 'refused' ? 'btn-danger' : 'btn-secondary'}`}
+                      style={{ fontSize: '17px' }}
+                      onClick={() => setAction('refused')}
+                    >
+                      ✗ סירב/ה
+                    </button>
+                  </div>
+                </div>
+
+                {action && (
+                  <div className="form-group">
+                    <label className="form-label">
+                      {action === 'refused' ? 'סיבה לסירוב (חובה)' : 'הערה (אופציונלי)'}
+                    </label>
+                    <textarea
+                      className="form-input"
+                      placeholder={action === 'refused' ? 'פרט/י את הסיבה לסירוב...' : 'הוסף/י הערה...'}
+                      value={reason}
+                      onChange={e => setReason(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+                )}
+
+                {overrideMode && (
+                  <div className="form-group">
+                    <label className="form-label">סיבת עדכון (חובה)</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="הסבר/י מדוע את/ה מעדכנ/ת את החתימה"
+                      value={overrideReason}
+                      onChange={e => setOverrideReason(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="grid-2" style={{ marginTop: '8px' }}>
+                  <button
+                    className="btn btn-primary btn-lg"
+                    onClick={handleSign}
+                    disabled={submitting || !action}
+                  >
+                    {submitting ? 'שומר...' : 'שמור'}
+                  </button>
+                  <button className="btn btn-secondary btn-lg" onClick={() => setModalView('')}>
+                    חזרה
+                  </button>
+                </div>
+              </>
             )}
 
-            <div className="grid-2" style={{ marginTop: '8px' }}>
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={handleSign}
-                disabled={submitting || !action}
-              >
-                {submitting ? 'שומר...' : 'שמור'}
-              </button>
-              <button className="btn btn-secondary btn-lg" onClick={closeModal}>
+            {/* Summary view */}
+            {modalView === 'summary' && (
+              <>
+                <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '10px' }}>
+                  סיכום יומי לכיתה {grade} — {dateDisplay}
+                </div>
+
+                {summaryError && <div className="alert alert-error">{summaryError}</div>}
+
+                <div className="form-group">
+                  <label className="form-label">סיכום היום</label>
+                  <textarea
+                    className="form-input"
+                    placeholder="הזן/י סיכום יומי לכיתה..."
+                    value={summaryText}
+                    onChange={e => setSummaryText(e.target.value)}
+                    rows={5}
+                    style={{ resize: 'vertical' }}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid-2" style={{ marginTop: '8px' }}>
+                  <button
+                    className="btn btn-primary btn-lg"
+                    onClick={handleSaveSummary}
+                    disabled={savingSummary}
+                  >
+                    {savingSummary ? 'שומר...' : 'שמור סיכום'}
+                  </button>
+                  <button className="btn btn-secondary btn-lg" onClick={() => setModalView('')}>
+                    חזרה
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Close button at bottom for initial view */}
+            {modalView === '' && (
+              <button className="btn btn-ghost btn-lg" style={{ marginTop: '10px', width: '100%' }} onClick={closeModal}>
                 ביטול
               </button>
-            </div>
+            )}
           </div>
         </div>
       )}
