@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
@@ -14,153 +14,126 @@ const fmtLong = (dateStr) =>
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-const fmtShort = (dateStr) =>
-  new Date(dateStr + 'T12:00:00').toLocaleDateString('he-IL', {
-    day: 'numeric', month: 'long', year: 'numeric',
-  });
-
 export default function SummaryViewPage() {
   const navigate = useNavigate();
 
-  const [grade, setGrade] = useState('');
-  const [availableDates, setAvailableDates] = useState([]);
-  const [loadingDates, setLoadingDates] = useState(false);
+  const [selectedGrades, setSelectedGrades] = useState([]);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [summaries, setSummaries] = useState([]);
-  const [loadingSummaries, setLoadingSummaries] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
 
-  useEffect(() => {
-    if (!grade) return;
-    setAvailableDates([]);
-    setFromDate('');
-    setToDate('');
+  const toggleGrade = (g) => {
+    setSelectedGrades(prev =>
+      prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]
+    );
     setSummaries([]);
     setFetched(false);
-    setError('');
-    setLoadingDates(true);
-    api.get(`/summaries/dates?grade=${grade}`)
-      .then(res => setAvailableDates(res.data))
-      .catch(() => setError('שגיאה בטעינת תאריכים'))
-      .finally(() => setLoadingDates(false));
-  }, [grade]);
+  };
 
-  useEffect(() => {
-    if (!grade || !fromDate || !toDate) return;
-    setLoadingSummaries(true);
+  const handleSearch = async () => {
+    if (!selectedGrades.length || !fromDate || !toDate) {
+      setError('נדרשים כיתה, מתאריך ועד תאריך');
+      return;
+    }
+    setLoading(true);
     setFetched(false);
     setError('');
     const effectiveFrom = fromDate <= toDate ? fromDate : toDate;
     const effectiveTo   = fromDate <= toDate ? toDate   : fromDate;
-    api.get(`/summaries/range?grade=${grade}&from=${effectiveFrom}&to=${effectiveTo}`)
-      .then(res => { setSummaries(res.data); setFetched(true); })
-      .catch(() => setError('שגיאה בטעינת סיכומים'))
-      .finally(() => setLoadingSummaries(false));
-  }, [grade, fromDate, toDate]);
-
-  const fromOptions = availableDates.filter(d => !toDate || d <= toDate);
-  const toOptions   = availableDates.filter(d => !fromDate || d >= fromDate);
+    try {
+      const res = await api.get('/summaries/range', {
+        params: { grades: selectedGrades.join(','), from: effectiveFrom, to: effectiveTo },
+      });
+      setSummaries(res.data);
+      setFetched(true);
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.response?.data?.debug
+        ? `שגיאה: ${JSON.stringify(err.response.data)}`
+        : 'שגיאה בטעינת סיכומים';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="page">
       <div className="page-header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/grades')}>← חזרה</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}>← חזרה</button>
         <div>
-          <div className="page-title">📋 סיכומים</div>
+          <div className="page-title">📋 סיכומים יומיים</div>
         </div>
         <div style={{ width: '64px' }} />
       </div>
 
       <div className="page-content">
 
-        {/* Grade selection */}
         <div style={{ marginBottom: '24px' }}>
-          <div className="form-label" style={{ fontSize: '15px', marginBottom: '10px' }}>בחר כיתה</div>
+          <div className="form-label" style={{ fontSize: '15px', marginBottom: '10px' }}>בחר כיתות (ניתן לבחור כמה)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-            {GRADES.map(g => (
-              <button
-                key={g.value}
-                onClick={() => setGrade(g.value)}
-                style={{
-                  padding: '14px 6px',
-                  borderRadius: '14px',
-                  border: `2px solid ${grade === g.value ? 'var(--primary)' : 'var(--gray-200)'}`,
-                  background: grade === g.value ? 'var(--primary-xlight)' : 'white',
-                  color: grade === g.value ? 'var(--primary-dark)' : 'var(--gray-700)',
-                  fontWeight: grade === g.value ? '800' : '600',
-                  fontSize: '18px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  boxShadow: grade === g.value ? '0 0 0 3px var(--primary-light)' : 'var(--shadow)',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {g.label}
-              </button>
-            ))}
+            {GRADES.map(g => {
+              const selected = selectedGrades.includes(g.value);
+              return (
+                <button
+                  key={g.value}
+                  onClick={() => toggleGrade(g.value)}
+                  style={{
+                    padding: '14px 6px',
+                    borderRadius: '14px',
+                    border: `2px solid ${selected ? 'var(--primary)' : 'var(--gray-200)'}`,
+                    background: selected ? 'var(--primary-xlight)' : 'white',
+                    color: selected ? 'var(--primary-dark)' : 'var(--gray-700)',
+                    fontWeight: selected ? '800' : '600',
+                    fontSize: '18px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    boxShadow: selected ? '0 0 0 3px var(--primary-light)' : 'var(--shadow)',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {g.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Date range */}
-        {grade && (
-          <div style={{ marginBottom: '24px' }}>
-            {loadingDates ? (
-              <div className="loading-center">
-                <div className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
-              </div>
-            ) : availableDates.length === 0 ? (
-              <div style={{
-                textAlign: 'center', padding: '28px 20px',
-                background: 'white', borderRadius: '14px',
-                color: 'var(--gray-400)', fontSize: '15px',
-                boxShadow: 'var(--shadow)',
-              }}>
-                אין סיכומים לכיתה {grade}
-              </div>
-            ) : (
-              <>
-                <div className="form-label" style={{ fontSize: '15px', marginBottom: '10px' }}>בחר טווח תאריכים</div>
-                <div className="grid-2">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">מתאריך</label>
-                    <select
-                      className="form-input"
-                      value={fromDate}
-                      onChange={e => setFromDate(e.target.value)}
-                    >
-                      <option value="">בחר...</option>
-                      {fromOptions.map(d => (
-                        <option key={d} value={d}>{fmtShort(d)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">עד תאריך</label>
-                    <select
-                      className="form-input"
-                      value={toDate}
-                      onChange={e => setToDate(e.target.value)}
-                    >
-                      <option value="">בחר...</option>
-                      {toOptions.map(d => (
-                        <option key={d} value={d}>{fmtShort(d)}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
+        <div className="grid-2" style={{ marginBottom: '16px' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">מתאריך</label>
+            <input
+              className="form-input"
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+            />
           </div>
-        )}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">עד תאריך</label>
+            <input
+              className="form-input"
+              type="date"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <button
+          className="btn btn-primary btn-lg"
+          style={{ width: '100%', marginBottom: '20px' }}
+          onClick={handleSearch}
+          disabled={loading || !selectedGrades.length || !fromDate || !toDate}
+        >
+          {loading ? 'טוען...' : 'הצג סיכומים'}
+        </button>
 
         {error && <div className="alert alert-error">{error}</div>}
 
-        {/* Results */}
-        {loadingSummaries ? (
-          <div className="loading-center"><div className="spinner" /></div>
-        ) : fetched && summaries.length === 0 ? (
+        {fetched && summaries.length === 0 && (
           <div style={{
             textAlign: 'center', padding: '40px 20px',
             color: 'var(--gray-400)', fontSize: '15px',
@@ -169,7 +142,9 @@ export default function SummaryViewPage() {
           }}>
             אין סיכומים בטווח התאריכים הנבחר
           </div>
-        ) : summaries.length > 0 ? (
+        )}
+
+        {summaries.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             {summaries.map(s => (
               <div
@@ -182,46 +157,43 @@ export default function SummaryViewPage() {
                   border: '1px solid var(--gray-200)',
                 }}
               >
-                {/* Card header */}
                 <div style={{
                   background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
                   padding: '13px 18px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
+                  gap: '8px',
                 }}>
-                  <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>
+                  <span style={{ color: 'white', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
                     📅 {fmtLong(s.date)}
                   </span>
-                  <span style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    padding: '3px 11px',
-                    borderRadius: '20px',
-                    flexShrink: 0,
-                  }}>
-                    כיתה {s.grade}
-                  </span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {s.student_name && (
+                      <span style={{
+                        background: 'rgba(255,255,255,0.25)',
+                        color: 'white',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        padding: '3px 11px',
+                        borderRadius: '20px',
+                      }}>
+                        👤 {s.student_name}
+                      </span>
+                    )}
+                    <span style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      color: 'white',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      padding: '3px 11px',
+                      borderRadius: '20px',
+                    }}>
+                      כיתה {s.grade}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Author */}
-                <div style={{
-                  padding: '9px 18px',
-                  background: 'var(--gray-50)',
-                  borderBottom: '1px solid var(--gray-100)',
-                  fontSize: '13px',
-                  color: 'var(--gray-600)',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}>
-                  ✍️ {s.staff_name || 'לא ידוע'}
-                </div>
-
-                {/* Content */}
                 <div style={{
                   padding: '16px 18px',
                   fontSize: '15px',
@@ -234,9 +206,8 @@ export default function SummaryViewPage() {
               </div>
             ))}
           </div>
-        ) : null}
+        )}
 
-        {/* Spacer for FAB */}
         <div style={{ height: '80px' }} />
       </div>
     </div>

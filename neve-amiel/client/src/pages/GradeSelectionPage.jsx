@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 
 const GRADES = [
   { value: 'ט', label: "כיתה ט'", icon: '📚' },
@@ -10,31 +9,24 @@ const GRADES = [
 
 export default function GradeSelectionPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const today = new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today = new Date().toLocaleDateString('he-IL', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
 
   const handleSelect = (grade) => {
     sessionStorage.setItem('selectedGrade', grade);
     navigate('/signature-type');
   };
 
-  const visibleGrades = user?.role === 'admin'
-    ? GRADES
-    : GRADES.filter(g => g.value === user?.grade);
-
   return (
     <div className="page">
       <div className="page-header">
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}>← חזרה</button>
         <div>
           <div className="page-title">💊 נווה עמיאל</div>
-          <div className="page-subtitle">שלום, {user?.full_name}</div>
+          <div className="page-subtitle">בחר/י כיתה</div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {user?.role === 'admin' && (
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/admin')}>ניהול</button>
-          )}
-          <button className="btn btn-ghost btn-sm" onClick={logout}>יציאה</button>
-        </div>
+        <div style={{ width: '68px' }} />
       </div>
 
       <div className="page-content">
@@ -46,7 +38,7 @@ export default function GradeSelectionPage() {
         <p style={{ color: 'var(--gray-500)', marginBottom: '24px', fontSize: '15px' }}>לאיזו כיתה תרצה/י להחתים?</p>
 
         <div className="selection-grid">
-          {visibleGrades.map(g => (
+          {GRADES.map(g => (
             <div key={g.value} className="selection-card" onClick={() => handleSelect(g.value)}>
               <div className="s-icon">{g.icon}</div>
               <div className="s-label">{g.value}</div>

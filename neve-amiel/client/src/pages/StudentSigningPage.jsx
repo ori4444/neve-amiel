@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
 const TYPE_LABELS = { morning: 'בוקר', evening: 'ערב', other: 'תאריך שנבחר' };
@@ -8,22 +7,20 @@ const TYPE_ICONS  = { morning: '🌅', evening: '🌙', other: '📅' };
 
 export default function StudentSigningPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const [grade] = useState(() => sessionStorage.getItem('selectedGrade') || '');
   const [signingType] = useState(() => sessionStorage.getItem('signingType') || '');
   const [signingDate] = useState(() => sessionStorage.getItem('signingDate') || '');
+  const [instructorName] = useState(() => sessionStorage.getItem('instructorName') || '');
 
   const [students, setStudents] = useState([]);
   const [signatures, setSignatures] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // modal state
   const [modalStudent, setModalStudent] = useState(null);
-  const [modalView, setModalView] = useState(''); // '' | 'signing' | 'summary'
+  const [modalView, setModalView] = useState('');
 
-  // signing state
   const [action, setAction] = useState('');
   const [reason, setReason] = useState('');
   const [overrideMode, setOverrideMode] = useState(false);
@@ -31,7 +28,6 @@ export default function StudentSigningPage() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
-  // summary state
   const [summaryText, setSummaryText] = useState('');
   const [savingSummary, setSavingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState('');
@@ -63,15 +59,15 @@ export default function StudentSigningPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const loadSummary = useCallback(async () => {
-    if (!grade || !signingDate) return;
+  const loadSummary = useCallback(async (studentId) => {
+    if (!studentId || !signingDate) return;
     try {
-      const res = await api.get(`/summaries?grade=${grade}&date=${signingDate}`);
+      const res = await api.get(`/summaries?student_id=${studentId}&date=${signingDate}`);
       setSummaryText(res.data?.content || '');
     } catch {
       setSummaryText('');
     }
-  }, [grade, signingDate]);
+  }, [signingDate]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -97,7 +93,7 @@ export default function StudentSigningPage() {
 
   const openSummary = async () => {
     setModalView('summary');
-    await loadSummary();
+    await loadSummary(modalStudent?.id);
   };
 
   const handleSign = async () => {
@@ -115,6 +111,7 @@ export default function StudentSigningPage() {
         action,
         reason: reason.trim() || undefined,
         override_reason: overrideMode ? overrideReason.trim() : undefined,
+        instructor_name: instructorName || undefined,
       });
 
       const sigRes = await api.get(`/signatures?grade=${grade}&signing_type=${signingType}&date=${signingDate}`);
@@ -142,7 +139,13 @@ export default function StudentSigningPage() {
     setSavingSummary(true);
     setSummaryError('');
     try {
-      await api.post('/summaries', { grade, date: signingDate, content: summaryText });
+      await api.post('/summaries', {
+        grade,
+        date: signingDate,
+        content: summaryText,
+        student_id: modalStudent?.id,
+        student_name: modalStudent?.name,
+      });
       closeModal();
       showToast('✓ הסיכום נשמר בהצלחה');
     } catch (err) {
@@ -152,10 +155,7 @@ export default function StudentSigningPage() {
     }
   };
 
-  const filtered = students.filter(s =>
-    !search || s.name.includes(search)
-  );
-
+  const filtered = students.filter(s => !search || s.name.includes(search));
   const signedCount = Object.keys(signatures).length;
   const progress = students.length > 0 ? (signedCount / students.length) * 100 : 0;
 
@@ -191,7 +191,6 @@ export default function StudentSigningPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
-          <span className="badge badge-blue">👤 {user?.full_name}</span>
           <span className="badge badge-gray">{TYPE_ICONS[signingType]} {TYPE_LABELS[signingType]}</span>
           <span className={`badge ${signedCount === students.length && students.length > 0 ? 'badge-green' : 'badge-orange'}`}>
             {signedCount === students.length && students.length > 0 ? '✓ הושלם' : `נותרו ${students.length - signedCount}`}
@@ -245,14 +244,12 @@ export default function StudentSigningPage() {
         )}
       </div>
 
-      {/* Student Action Modal */}
       {modalStudent && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title">{modalStudent.name}</div>
 
-            {/* Initial: choose action */}
             {modalView === '' && (
               <div className="grid-2" style={{ marginTop: '8px' }}>
                 <button
@@ -272,7 +269,6 @@ export default function StudentSigningPage() {
               </div>
             )}
 
-            {/* Signing view */}
             {modalView === 'signing' && (
               <>
                 {modalError && <div className="alert alert-error">{modalError}</div>}
@@ -345,11 +341,10 @@ export default function StudentSigningPage() {
               </>
             )}
 
-            {/* Summary view */}
             {modalView === 'summary' && (
               <>
                 <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '10px' }}>
-                  סיכום יומי לכיתה {grade} — {dateDisplay}
+                  סיכום יומי עבור {modalStudent?.name} — {dateDisplay}
                 </div>
 
                 {summaryError && <div className="alert alert-error">{summaryError}</div>}
@@ -382,7 +377,6 @@ export default function StudentSigningPage() {
               </>
             )}
 
-            {/* Close button at bottom for initial view */}
             {modalView === '' && (
               <button className="btn btn-ghost btn-lg" style={{ marginTop: '10px', width: '100%' }} onClick={closeModal}>
                 ביטול

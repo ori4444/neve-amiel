@@ -1,28 +1,35 @@
 const express = require('express');
 const router  = express.Router();
 const { getPool } = require('../db');
-const { authenticateToken } = require('../middleware/auth');
 
-router.get('/', authenticateToken, async (req, res) => {
-  const { date, student_id, grade, user_id, signing_type, start_date, end_date } = req.query;
+router.get('/', async (req, res) => {
+  const { date, student_id, grade, signing_type, start_date, end_date } = req.query;
   try {
     const params = [];
     let idx = 1;
     let q = `
-      SELECT s.*, st.name AS student_name, st.grade, u.full_name AS staff_name
+      SELECT s.*, st.name AS student_name, st.grade
       FROM signatures s
       JOIN students st ON s.student_id = st.id
-      JOIN users u ON s.user_id = u.id
       WHERE 1=1
     `;
     if (date)        { q += ` AND s.signing_date = $${idx++}`;    params.push(date); }
     if (student_id)  { q += ` AND s.student_id = $${idx++}`;      params.push(student_id); }
-    if (grade)       { q += ` AND st.grade = $${idx++}`;          params.push(grade); }
-    if (user_id)     { q += ` AND s.user_id = $${idx++}`;         params.push(user_id); }
+    if (grade) {
+      const gradeList = grade.split(',').map(g => g.trim()).filter(Boolean);
+      if (gradeList.length === 1) {
+        q += ` AND st.grade = $${idx++}`;
+        params.push(gradeList[0]);
+      } else if (gradeList.length > 1) {
+        const placeholders = gradeList.map(() => `$${idx++}`).join(',');
+        q += ` AND st.grade IN (${placeholders})`;
+        params.push(...gradeList);
+      }
+    }
     if (signing_type){ q += ` AND s.signing_type = $${idx++}`;    params.push(signing_type); }
     if (start_date)  { q += ` AND s.signing_date >= $${idx++}`;   params.push(start_date); }
     if (end_date)    { q += ` AND s.signing_date <= $${idx++}`;   params.push(end_date); }
-    q += ' ORDER BY s.created_at DESC';
+    q += ' ORDER BY s.signing_date DESC, s.created_at DESC';
 
     const { rows } = await getPool().query(q, params);
     res.json(rows);
@@ -32,8 +39,8 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, async (req, res) => {
-  const { student_id, signing_type, signing_date, action, reason, override_reason } = req.body;
+router.post('/', async (req, res) => {
+  const { student_id, signing_type, signing_date, action, reason, override_reason, instructor_name } = req.body;
   if (!student_id || !signing_type || !signing_date || !action)
     return res.status(400).json({ error: 'חסרים שדות חובה' });
   if (!['morning','evening','other'].includes(signing_type))
@@ -63,28 +70,18 @@ router.post('/', authenticateToken, async (req, res) => {
     if (existing && override_reason) {
       await pool.query(
         `UPDATE signatures
-           SET action=$1, reason=$2, override_reason=$3, is_override=1, user_id=$4, created_at=NOW()
+           SET action=$1, reason=$2, override_reason=$3, is_override=1, instructor_name=$4, created_at=NOW()
          WHERE id=$5`,
-        [action, reason || null, override_reason, req.user.id, existing.id]
-      );
-      await pool.query(
-        'INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES ($1,$2,$3,$4,$5)',
-        [req.user.id, 'override_signature', 'signature', existing.id,
-          JSON.stringify({ student_id, signing_type, signing_date, override_reason })]
+        [action, reason || null, override_reason, instructor_name || null, existing.id]
       );
       const { rows: updated } = await pool.query('SELECT * FROM signatures WHERE id=$1', [existing.id]);
       return res.json(updated[0]);
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO signatures (student_id, user_id, signing_type, signing_date, action, reason)
+      `INSERT INTO signatures (student_id, signing_type, signing_date, action, reason, instructor_name)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [student_id, req.user.id, signing_type, signing_date, action, reason || null]
-    );
-    await pool.query(
-      'INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES ($1,$2,$3,$4,$5)',
-      [req.user.id, 'create_signature', 'signature', rows[0].id,
-        JSON.stringify({ student_id, signing_type, signing_date, action })]
+      [student_id, signing_type, signing_date, action, reason || null, instructor_name || null]
     );
 
     res.status(201).json(rows[0]);

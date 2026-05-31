@@ -1,38 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
 import { useOnlineStatus } from './utils/useOnlineStatus';
-import LoginPage from './pages/LoginPage';
+import InstructorLoginPage from './pages/InstructorLoginPage';
+import HomePage from './pages/HomePage';
 import GradeSelectionPage from './pages/GradeSelectionPage';
 import SignatureTypePage from './pages/SignatureTypePage';
 import StudentSigningPage from './pages/StudentSigningPage';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminStudents from './pages/AdminStudents';
 import SummaryViewPage from './pages/SummaryViewPage';
-import Sidebar from './components/Sidebar';
-
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="loading-full"><div className="spinner" /></div>;
-  if (!user) return <Navigate to="/" replace />;
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/grades" replace />;
-  return children;
-}
-
-function AppRoutes() {
-  const { user } = useAuth();
-  return (
-    <Routes>
-      <Route path="/" element={user ? <Navigate to="/grades" replace /> : <LoginPage />} />
-      <Route path="/grades" element={<ProtectedRoute><GradeSelectionPage /></ProtectedRoute>} />
-      <Route path="/signature-type" element={<ProtectedRoute><SignatureTypePage /></ProtectedRoute>} />
-      <Route path="/signing" element={<ProtectedRoute><StudentSigningPage /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
-      <Route path="/admin/students" element={<ProtectedRoute adminOnly><AdminStudents /></ProtectedRoute>} />
-      <Route path="/summaries" element={<ProtectedRoute><SummaryViewPage /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
+import AttendanceSummaryPage from './pages/AttendanceSummaryPage';
+import AddStudentPage from './pages/AddStudentPage';
 
 function OfflineBanner() {
   const online = useOnlineStatus();
@@ -43,11 +18,18 @@ function OfflineBanner() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <OfflineBanner />
-        <AppRoutes />
-        <Sidebar />
-      </AuthProvider>
+      <OfflineBanner />
+      <Routes>
+        <Route path="/" element={<InstructorLoginPage />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/grades" element={<GradeSelectionPage />} />
+        <Route path="/signature-type" element={<SignatureTypePage />} />
+        <Route path="/signing" element={<StudentSigningPage />} />
+        <Route path="/summaries" element={<SummaryViewPage />} />
+        <Route path="/attendance-report" element={<AttendanceSummaryPage />} />
+        <Route path="/add-student" element={<AddStudentPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }

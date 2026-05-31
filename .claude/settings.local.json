@@ -18,7 +18,24 @@
       "Bash(node --check server/routes/students.js)",
       "Bash(node *)",
       "PowerShell(Get-NetTCPConnection *)",
-      "Bash(Get-ChildItem C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\server *)"
+      "Bash(Get-ChildItem C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\server *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\" -Recurse -Directory)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)",
+      "Bash(git commit *)",
+      "Bash(Get-ChildItem -Recurse -Force)",
+      "Bash(Select-Object -Property FullName)",
+      "Bash(Sort-Object FullName)",
+      "PowerShell(tree *)",
+      "PowerShell(Get-ChildItem -Path C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\server -Depth 2 | Where-Object { $_.PSIsContainer -or $_.Extension -in @\\('.js', '.json', '.ts'\\) } | Select-Object -Property @{Name='Path'; Expression={$_.FullName.Replace\\('C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\server\\\\', ''\\)}} | Format-List)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\client\\\\src\\\\pages\\\\LoginPage.jsx\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\client\\\\src\\\\pages\\\\AdminDashboard.jsx\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\client\\\\src\\\\pages\\\\AdminStudents.jsx\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\client\\\\src\\\\context\\\\AuthContext.jsx\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\ONE1\\\\Desktop\\\\elkana\\\\neve-amiel\\\\client\\\\src\\\\components\\\\Sidebar.jsx\" -Force)"
     ]
   }
 }

@@ -11,6 +11,7 @@ export default function SignatureTypePage() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [grade, setGrade] = useState('');
 
   useEffect(() => {
@@ -28,8 +29,13 @@ export default function SignatureTypePage() {
 
   const handleDateConfirm = () => {
     if (!selectedDate) return;
-    sessionStorage.setItem('signingType', 'other');
     sessionStorage.setItem('signingDate', selectedDate);
+    setShowDatePicker(false);
+    setShowTimePicker(true);
+  };
+
+  const handleTimeSelect = (type) => {
+    sessionStorage.setItem('signingType', type);
     navigate('/signing');
   };
 
@@ -47,7 +53,36 @@ export default function SignatureTypePage() {
       </div>
 
       <div className="page-content">
-        {showDatePicker ? (
+        {showTimePicker ? (
+          <div className="card">
+            <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '18px' }}>🕐 בוקר או ערב?</h3>
+            <p style={{ color: 'var(--gray-500)', marginBottom: '20px', fontSize: '15px' }}>
+              בחר/י את סוג ההחתמה לתאריך שנבחר
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {[
+                { value: 'morning', label: 'החתמת בוקר', icon: '🌅', sub: 'תרופות בוקר' },
+                { value: 'evening', label: 'החתמת ערב', icon: '🌙', sub: 'תרופות ערב' },
+              ].map(t => (
+                <div
+                  key={t.value}
+                  className="selection-card"
+                  style={{ flexDirection: 'row', padding: '20px 22px', minHeight: '82px', textAlign: 'right', justifyContent: 'flex-start', gap: '18px', borderRadius: '16px' }}
+                  onClick={() => handleTimeSelect(t.value)}
+                >
+                  <div style={{ fontSize: '38px', lineHeight: 1 }}>{t.icon}</div>
+                  <div>
+                    <div className="s-label" style={{ fontSize: '19px', textAlign: 'right' }}>{t.label}</div>
+                    <div className="s-sub" style={{ textAlign: 'right', marginTop: '4px' }}>{t.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-ghost btn-lg" style={{ marginTop: '14px', width: '100%' }} onClick={() => { setShowTimePicker(false); setShowDatePicker(true); }}>
+              ← חזרה לבחירת תאריך
+            </button>
+          </div>
+        ) : showDatePicker ? (
           <div className="card">
             <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '18px' }}>📅 בחר/י תאריך</h3>
             <div className="form-group">

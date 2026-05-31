@@ -1,12 +1,9 @@
 const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
 
 let pool;
 
 function getPool() {
   if (!pool) {
-    // If DB_PASSWORD is set, parse the URL and inject the raw password as a
-    // separate field — avoids any URL-encoding issues with special characters.
     const dbUrl = process.env.DATABASE_URL || '';
     const rawPassword = process.env.DB_PASSWORD;
 
@@ -17,7 +14,7 @@ function getPool() {
         user:     parsed.username,
         host:     parsed.hostname,
         database: parsed.pathname.replace(/^\//, ''),
-        password: rawPassword,           // raw string, no URL encoding needed
+        password: rawPassword,
         port:     Number(parsed.port) || 5432,
         ssl:      { rejectUnauthorized: false },
         max:      2,
@@ -43,21 +40,6 @@ function getPool() {
 async function initializeDatabase() {
   const client = await getPool().connect();
   try {
-    // --- Schema ---
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id          SERIAL PRIMARY KEY,
-        username    TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        full_name   TEXT NOT NULL,
-        role        TEXT DEFAULT 'staff' CHECK (role IN ('admin','staff')),
-        grade       TEXT,
-        active      INTEGER DEFAULT 1,
-        created_at  TIMESTAMPTZ DEFAULT NOW(),
-        last_login  TIMESTAMPTZ
-      )
-    `);
-
     await client.query(`
       CREATE TABLE IF NOT EXISTS students (
         id         SERIAL PRIMARY KEY,
@@ -74,7 +56,6 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS signatures (
         id           SERIAL PRIMARY KEY,
         student_id   INTEGER NOT NULL REFERENCES students(id),
-        user_id      INTEGER NOT NULL REFERENCES users(id),
         signing_type TEXT NOT NULL CHECK (signing_type IN ('morning','evening','other')),
         signing_date DATE NOT NULL,
         action       TEXT NOT NULL CHECK (action IN ('took','refused')),
@@ -87,48 +68,79 @@ async function initializeDatabase() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS audit_logs (
-        id          SERIAL PRIMARY KEY,
-        user_id     INTEGER REFERENCES users(id),
-        action      TEXT NOT NULL,
-        entity_type TEXT,
-        entity_id   INTEGER,
-        details     TEXT,
-        ip_address  TEXT,
-        created_at  TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS grade TEXT`);
-
-    await client.query(`
       CREATE TABLE IF NOT EXISTS daily_summaries (
         id         SERIAL PRIMARY KEY,
         grade      TEXT NOT NULL CHECK (grade IN ('ט','י','יא','יב')),
         date       DATE NOT NULL,
         content    TEXT NOT NULL,
-        user_id    INTEGER REFERENCES users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE (grade, date)
       )
     `);
 
+    // migration: make user_id nullable on existing deployments
+    await client.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='signatures' AND column_name='user_id'
+        ) THEN
+          ALTER TABLE signatures ALTER COLUMN user_id DROP NOT NULL;
+        END IF;
+      END $$
+    `);
+
+    // migration: add instructor_name column if not exists
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='signatures' AND column_name='instructor_name'
+        ) THEN
+          ALTER TABLE signatures ADD COLUMN instructor_name TEXT;
+        END IF;
+      END $$
+    `);
+
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sig_date    ON signatures(signing_date)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sig_student ON signatures(student_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_sig_user    ON signatures(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_stu_grade   ON students(grade)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sum_grade_date ON daily_summaries(grade, date)`);
 
-    // --- Seed default admin + sample students if DB is empty ---
-    const { rows } = await client.query('SELECT COUNT(*) AS c FROM users');
-    if (parseInt(rows[0].c) === 0) {
-      const hash = await bcrypt.hash('admin123', 10);
-      await client.query(
-        'INSERT INTO users (username, password_hash, full_name, role) VALUES ($1,$2,$3,$4)',
-        ['admin', hash, 'מנהל מערכת', 'admin']
-      );
+    // migration: add student_id and student_name to daily_summaries
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='daily_summaries' AND column_name='student_id'
+        ) THEN
+          ALTER TABLE daily_summaries ADD COLUMN student_id INTEGER REFERENCES students(id);
+          ALTER TABLE daily_summaries ADD COLUMN student_name TEXT;
+        END IF;
+      END $$
+    `);
 
+    // migration: drop old grade+date unique constraint, add per-student unique index
+    await client.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='daily_summaries' AND constraint_type='UNIQUE'
+          AND constraint_name='daily_summaries_grade_date_key'
+        ) THEN
+          ALTER TABLE daily_summaries DROP CONSTRAINT daily_summaries_grade_date_key;
+        END IF;
+      END $$
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_sum_student_date
+        ON daily_summaries(student_id, date)
+        WHERE student_id IS NOT NULL
+    `);
+
+    const { rows } = await client.query('SELECT COUNT(*) AS c FROM students');
+    if (parseInt(rows[0].c) === 0) {
       const samples = [
         ['אברהם כהן','ט'], ['שרה לוי','ט'], ['יעקב ישראלי','ט'], ['מיכל דוד','ט'],
         ['רחל גולן','י'], ['דוד מזרחי','י'], ['מרים פרץ','י'], ['יוסי אלוני','י'],
