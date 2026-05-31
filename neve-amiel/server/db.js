@@ -51,6 +51,7 @@ async function initializeDatabase() {
         password_hash TEXT NOT NULL,
         full_name   TEXT NOT NULL,
         role        TEXT DEFAULT 'staff' CHECK (role IN ('admin','staff')),
+        grade       TEXT,
         active      INTEGER DEFAULT 1,
         created_at  TIMESTAMPTZ DEFAULT NOW(),
         last_login  TIMESTAMPTZ
